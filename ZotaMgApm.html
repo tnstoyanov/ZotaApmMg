@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZotaPay Payment Redirect</title>
+    <script>
+        async function submitPayment(event) {
+            event.preventDefault();
+            
+            const formData = new FormData(document.getElementById("paymentForm"));
+            const merchantOrderID = formData.get("merchantOrderID");
+            const orderAmount = formData.get("orderAmount");
+            const customerEmail = formData.get("customerEmail");
+            const secretKey = formData.get("secretKey");
+            const endpointID = "90196";
+            
+            const signatureString = endpointID + merchantOrderID + orderAmount + customerEmail + secretKey;
+            const signature = await sha256(signatureString);
+            
+            const requestBody = {
+                "merchantOrderID": merchantOrderID,
+                "merchantOrderDesc": formData.get("merchantOrderDesc"),
+                "orderAmount": orderAmount,
+                "orderCurrency": formData.get("orderCurrency"),
+                "customerEmail": customerEmail,
+                "customerFirstName": formData.get("customerFirstName"),
+                "customerLastName": formData.get("customerLastName"),
+                "customerAddress": formData.get("customerAddress"),
+                "customerCountryCode": formData.get("customerCountryCode"),
+                "customerCity": formData.get("customerCity"),
+                "customerZipCode": formData.get("customerZipCode"),
+                "customerPhone": formData.get("customerPhone"),
+                "customerBankCode": "",
+                "customerIP": "92.247.243.134",
+                "redirectUrl": "https://tnstoyanov.wixsite.com/payment-response",
+                "callbackUrl": "https://134c42544079320525a9dce00b75e544.m.pipedream.net",
+                "customParam": "{\"UserId\": \"7654321\"}",
+                "checkoutUrl": "https://tnstoyanov.wixsite.com/payment-response",
+                "signature": signature
+            };
+            
+            try {
+                const response = await fetch('http://localhost:3000/proxy/payment', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(requestBody)
+                });
+                
+                const result = await response.json();
+                if (response.ok && result.data && result.data.depositUrl) {
+                    document.getElementById("depositUrl").value = result.data.depositUrl;
+                    document.getElementById("overlay").style.display = "block";
+                    document.getElementById("modal").style.display = "block";
+                } else {
+                    displayError(result.error.code || response.status, result.error.message || "Unknown error");
+                }
+            } catch (error) {
+                console.error("Payment request failed:", error);
+                displayError(500, "Payment request failed.");
+            }
+        }
+        
+        async function sha256(message) {
+            const msgBuffer = new TextEncoder().encode(message);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+            return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+        }
+
+        function displayError(code, message) {
+            const overlay = document.getElementById("overlay");
+            const modal = document.getElementById("modal");
+            const errorMessage = document.getElementById("errorMessage");
+            errorMessage.innerHTML = `<strong style="color: red;">Error ${code}: ${message}</strong>`;
+            overlay.style.display = "block";
+            modal.style.display = "block";
+        }
+
+        function closeModal() {
+            const overlay = document.getElementById("overlay");
+            const modal = document.getElementById("modal");
+            overlay.style.display = "none";
+            modal.style.display = "none";
+        }
+
+        function redirectToZota() {
+            const depositUrl = document.getElementById("depositUrl").value;
+            window.open(depositUrl, '_blank');
+            closeModal();
+        }
+    </script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        #paymentForm {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            width: 300px;
+            text-align: center;
+        }
+
+        .logo-container {
+            background-color: #003366;
+            padding: 10px;
+            border-radius: 8px 8px 0 0;
+        }
+
+        .logo-container img {
+            width: 150px;
+        }
+
+        #paymentForm input, #paymentForm button {
+            width: calc(100% - 20px);
+            margin: 10px 0;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        #paymentForm button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+
+        #paymentForm button:hover {
+            background-color: #0056b3;
+        }
+
+        #overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+        }
+
+        #modal {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 20px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+            z-index: 1000;
+            text-align: center;
+        }
+
+        #modal .logo-container {
+            background-color: #003366;
+            padding: 10px;
+            border-radius: 8px 8px 0 0;
+        }
+
+        #modal img {
+            width: 100px;
+            margin-bottom: 20px;
+        }
+
+        #modal p {
+            margin: 10px 0;
+        }
+
+        #modal button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 10px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+
+        #modal button:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <form id="paymentForm" onsubmit="submitPayment(event)">
+        <div class="logo-container">
+            <img src="https://zota.com/wp-content/uploads/2023/01/zota-logo.svg" alt="Zota Logo">
+        </div>
+        <input type="hidden" name="merchantOrderID" value="" id="merchantOrderID">
+        <script>
+            document.getElementById("merchantOrderID").value = Math.floor(Math.random() * 1000000) + 3000000;
+        </script>
+        <input type="hidden" name="merchantOrderDesc" placeholder="Order Description" value="Test Order">
+        <input type="text" name="orderAmount" placeholder="Order Amount" value="200" required>
+        <input type="text" name="orderCurrency" placeholder="Order Currency" value="THB" required>
+        <input type="hidden" name="customerEmail" placeholder="Customer Email" value="tony.stoyanov@tiebreak.dev">
+        <input type="hidden" name="customerFirstName" placeholder="First Name" value="Tony">
+        <input type="hidden" name="customerLastName" placeholder="Last Name" value="Stoyanov">
+        <input type="hidden" name="customerAddress" placeholder="Address" value="11 Sun Street">
+        <input type="hidden" name="customerCountryCode" placeholder="Country Code" value="TH">
+        <input type="hidden" name="customerCity" placeholder="City" value="Sun City">
+        <input type="hidden" name="customerZipCode" placeholder="Zip Code" value="10010">
+        <input type="hidden" name="customerPhone" placeholder="Phone Number" value="+359888123456">
+        <input type="hidden" name="secretKey" value="95c8ac3c-74cb-4415-a7c0-d75db7d06c4a">
+        <button type="submit">Pay Now</button>
+        <input type="hidden" id="depositUrl">
+    </form>
+    <div id="overlay"></div>
+    <div id="modal">
+        <div class="logo-container">
+            <img src="https://zota.com/wp-content/uploads/2023/01/zota-logo.svg" alt="Zota Logo">
+        </div>
+        <p>You will be taken to Zota in a new tab.</p>
+        <p id="errorMessage"></p>
+        <button onclick="redirectToZota()">OK</button>
+        <button onclick="closeModal()">Cancel</button>
+    </div>
+</body>
+</html>
